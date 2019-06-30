@@ -2,7 +2,7 @@ steps:
   - label: smith.rs
     plugins:
       - docker#v1.1.1:
-          image: rust:1.35-stretch
+          image: smithsecuritydev/ci.rust-1.35:latest
     command:
       - 'aws s3 cp s3://smith-artefacts/cache/smith-rs-cache.tar.gz smith-rs-cache.tar.gz || true'
       - 'tar xfz smith-rs-cache.tar.gz -C \$CARGO_HOME || true'
