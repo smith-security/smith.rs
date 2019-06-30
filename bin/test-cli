@@ -1,0 +1,127 @@
+#!/bin/sh -eu
+
+
+cargo build --features cli-test
+
+test_smith() {
+    unset SMITH_CLI_ENVIRONMENT SMITH_CLI_PRINCIPAL SMITH_CLI_COMMAND
+    ./target/debug/smith "$@" > /dev/null
+    eval $(./target/debug/smith "$@")
+}
+
+echo "-- smith --"
+
+echo 'testing: no arguments'
+! ./target/debug/smith 2>/dev/null
+
+echo 'testing: missing environment'
+! ./target/debug/smith -p root  2>/dev/null
+
+echo 'testing: bad flag'
+! ./target/debug/smith --bad -e environment -p root  2>/dev/null
+
+echo 'testing: all flag, no command'
+test_smith -e red -p jill
+[ "$SMITH_CLI_ENVIRONMENT" = "red" ]
+[ "$SMITH_CLI_PRINCIPAL" = "jill" ]
+[ -z "${SMITH_CLI_COMMAND:-}" ]
+
+echo 'testing: long flag, no command'
+test_smith --environment red-long --principal jill-long
+[ "$SMITH_CLI_ENVIRONMENT" = "red-long" ]
+[ "$SMITH_CLI_PRINCIPAL" = "jill-long" ]
+[ -z "${SMITH_CLI_COMMAND:-}" ]
+
+
+echo 'testing: default principal'
+test_smith -e blue
+[ "$SMITH_CLI_ENVIRONMENT" = "blue" ]
+[ "$SMITH_CLI_PRINCIPAL" = "$USER" ]
+[ -z "${SMITH_CLI_COMMAND:-}" ]
+
+
+echo 'testing: default principal + environment from environment'
+SMITH_ENVIRONMENT=yellow test_smith
+[ "$SMITH_CLI_ENVIRONMENT" = "yellow" ]
+[ "$SMITH_CLI_PRINCIPAL" = "$USER" ]
+[ -z "${SMITH_CLI_COMMAND:-}" ]
+
+
+echo 'testing: explicit command'
+SMITH_ENVIRONMENT=pink test_smith some command
+[ "$SMITH_CLI_ENVIRONMENT" = "pink" ]
+[ "$SMITH_CLI_PRINCIPAL" = "$USER" ]
+[ "$SMITH_CLI_COMMAND" = "some command" ]
+
+
+echo 'testing: explicit command with flag'
+SMITH_ENVIRONMENT=green test_smith some command -- --with-flag
+[ "$SMITH_CLI_ENVIRONMENT" = "green" ]
+[ "$SMITH_CLI_PRINCIPAL" = "$USER" ]
+[ "$SMITH_CLI_COMMAND" = "some command --with-flag" ]
+
+
+echo 'testing: explicit command and environment'
+SMITH_ENVIRONMENT=green test_smith -e orange some command -- --with-flag
+[ "$SMITH_CLI_ENVIRONMENT" = "orange" ]
+[ "$SMITH_CLI_PRINCIPAL" = "$USER" ]
+[ "$SMITH_CLI_COMMAND" = "some command --with-flag" ]
+
+
+echo "OK"
+
+test_smith_host() {
+    unset SMITH_CLI_ENVIRONMENT SMITH_CLI_CA_OUTPUT
+    ./target/debug/smith-host "$@" > /dev/null
+    eval $(./target/debug/smith-host "$@")
+}
+
+echo "-- smith-host --"
+
+echo 'testing: no arguments'
+! ./target/debug/smith-host 2>/dev/null
+
+echo 'testing: missing environment'
+! ./target/debug/smith-host  2>/dev/null
+
+echo 'testing: bad flag'
+! ./target/debug/smith-host --bad -e environment 2>/dev/null
+
+echo 'testing: environment flag, no output file'
+test_smith_host -e red
+[ "$SMITH_CLI_ENVIRONMENT" = "red" ]
+[ -z "${SMITH_CLI_CA_OUTPUT:-}" ]
+
+echo 'testing: environment from environment, no output file'
+SMITH_ENVIRONMENT=blue test_smith_host
+[ "$SMITH_CLI_ENVIRONMENT" = "blue" ]
+[ -z "${SMITH_CLI_CA_OUTPUT:-}" ]
+
+
+echo 'testing: environment flag, with output file'
+test_smith_host -e green output-file
+[ "$SMITH_CLI_ENVIRONMENT" = "green" ]
+[ "$SMITH_CLI_CA_OUTPUT" = "output-file" ]
+
+
+echo 'testing: environment long flag, with output file'
+test_smith_host --environment green-long output-file
+[ "$SMITH_CLI_ENVIRONMENT" = "green-long" ]
+[ "$SMITH_CLI_CA_OUTPUT" = "output-file" ]
+
+
+echo 'testing: environment from environment, with output file'
+SMITH_ENVIRONMENT=pink test_smith_host output-file
+[ "$SMITH_CLI_ENVIRONMENT" = "pink" ]
+[ "$SMITH_CLI_CA_OUTPUT" = "output-file" ]
+
+
+echo 'testing: environment from environment, with hyphen prefixed output file'
+test_smith_host -e orange -- -output-file
+[ "$SMITH_CLI_ENVIRONMENT" = "orange" ]
+[ "$SMITH_CLI_CA_OUTPUT" = "-output-file" ]
+
+
+echo "OK"
+
+rm -f target/debug/smith  target/debug/smith-host
