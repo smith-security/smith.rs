@@ -1,0 +1,8 @@
+[package]
+name = "smith"
+version = "0.1.0"
+authors = ["Mark Hibberd <mark@hibberd.id.au>"]
+edition = "2018"
+
+[dependencies]
+clap = "2.33.0"
