@@ -12,6 +12,7 @@ pub struct Api {
 }
 
 
+#[derive(Debug)]
 pub enum Error {
     RequestError(reqwest::Error),
     InvalidStatusCode(reqwest::StatusCode),
@@ -30,8 +31,7 @@ impl fmt::Display for Error {
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct ServerError {
-    #[serde(rename = "sub")]
-    code: String,
+    error: String,
 }
 
 
@@ -51,7 +51,6 @@ impl Api {
             .header(header::ACCEPT, "application/json")
             .send()
             .map_err(|e| Error::RequestError(e))?;
-
         match response.status() {
             reqwest::StatusCode::OK => Ok(response),
             reqwest::StatusCode::BAD_REQUEST | reqwest::StatusCode::FORBIDDEN | reqwest::StatusCode::INTERNAL_SERVER_ERROR => {
@@ -69,5 +68,46 @@ impl Api {
             .json()
             .map_err(|e| Error::CouldNotParseResponse(e))
 
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::oauth2;
+    use crate::configuration::IdentityId;
+
+    use biscuit::jwk::JWK;
+    use std::fs::File;
+    use std::io::prelude::*;
+    use std::path::Path;
+
+
+    fn read_jwk(credentials: &Path) -> JWK<IdentityId> {
+        let mut file = File::open(credentials).expect("Credentials path should exist.");
+        let mut contents = String::new();
+        file.read_to_string(&mut contents).expect("Should be able to read credentials file.");
+        serde_json::from_str(&contents).expect("Should be able to deserialise credentials file.")
+    }
+
+    #[test]
+    fn test_whoami() {
+        let server = std::env::var("SERVER").unwrap_or("http://localhost:8000".to_string());
+        let jwk = read_jwk(Path::new("test/data/credentials.json"));
+        let oauth2 = oauth2::Configuration {
+            key: oauth2::Configuration::build_secret(&jwk).expect("Should be able to build signing secret"),
+            endpoint: format!("{}/oauth/token", server),
+            issuer: "me".to_string(),
+            audience: "mock".to_string(),
+            scopes: vec!["scope".to_string()],
+        };
+        let configuration = Configuration {
+            endpoint: server,
+            jwk,
+            oauth2,
+        };
+        let mut api = Api::new(configuration);
+        let userinfo = api.whoami().expect("Should be able to make userinfo call.");
+        assert_eq!(userinfo, UserInfo { user_id: "1".to_string() } );
     }
 }

@@ -4,7 +4,7 @@ use biscuit::jwk::JWK;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::ErrorKind;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct IdentityId {
@@ -14,7 +14,6 @@ pub struct IdentityId {
 
 #[derive(Clone)]
 pub struct Configuration {
-    pub home: PathBuf,
     pub endpoint: String,
     pub jwk: JWK<IdentityId>,
     pub oauth2: oauth2::Configuration,
@@ -72,6 +71,6 @@ impl Configuration {
             audience: "https://smith.st".to_string(),
             scopes: vec!["profile".to_string(), "ca".to_string()],
         };
-        Configuration { home, endpoint, jwk, oauth2 }
+        Configuration { endpoint, jwk, oauth2 }
     }
 }

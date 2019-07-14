@@ -220,13 +220,32 @@ fn build_secret(key: &RSAKeyParameters) -> Result<Secret, KeyError> {
 
 #[cfg(test)]
 mod tests {
-    use crate::configuration::Configuration;
+    use super::*;
+    use crate::configuration::IdentityId;
+    use std::fs::File;
+    use std::io::prelude::*;
+    use std::path::Path;
+
+    fn build_secret_from_file(credentials: &Path) -> Arc<Secret> {
+        let mut file = File::open(credentials).expect("Credentials path should exist.");
+        let mut contents = String::new();
+        file.read_to_string(&mut contents).expect("Should be able to read credentials file.");
+        let jwk: JWK<IdentityId> = serde_json::from_str(&contents).expect("Should be able to deserialise credentials file.");
+        Configuration::build_secret(&jwk).expect("Should be able to build signing secret.")
+    }
 
     #[test]
     fn test_oauth_token() {
-        let configuration = Configuration::from_env();
-        let mut store = configuration.oauth2.initialise();
-        let token = store.grant();
-        println!("token = {:?}", token);
+        let server = std::env::var("SERVER").unwrap_or("http://localhost:8000".to_string());
+        let configuration = Configuration {
+            key: build_secret_from_file(Path::new("test/data/credentials.json")),
+            endpoint: format!("{}/oauth/token", server),
+            issuer: "me".to_string(),
+            audience: "mock".to_string(),
+            scopes: vec!["scope".to_string()],
+        };
+        let mut store = configuration.initialise();
+        let token = store.grant().expect("Grant should succeed.");
+        assert_eq!(token, AccessToken { value: "mock".to_string() });
     }
 }
