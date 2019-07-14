@@ -8,7 +8,7 @@ extern crate serde_derive;
 extern crate yasna;
 
 pub mod api;
-pub mod codec;
 pub mod configuration;
+pub mod data;
 pub mod oauth2;
 pub mod version;

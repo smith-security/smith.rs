@@ -1,10 +1,13 @@
 use biscuit::{ClaimsSet, RegisteredClaims, JWT, SingleOrMultiple, StringOrUri};
 use biscuit::jwa::SignatureAlgorithm;
 use biscuit::jws::{RegisteredHeader, Secret};
-use biscuit::jwk::{AlgorithmParameters, RSAKeyParameters};
-use reqwest::{Client, Url};
+use biscuit::jwk::{JWK, AlgorithmParameters, RSAKeyParameters};
+use reqwest::Client;
 use reqwest::header::ACCEPT;
+use ring::signature::RsaKeyPair;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
+
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 struct PrivateClaims {
@@ -38,12 +41,38 @@ pub struct AccessTokenState {
 
 pub struct Store {
     pub client: Client,
+    pub state: Option<AccessTokenState>,
+    pub configuration: Configuration,
+}
+
+#[derive(Clone)]
+pub struct Configuration {
+    pub key: Arc<Secret>,
     pub endpoint: String,
-    pub key: Secret,
     pub issuer: String,
     pub audience: String,
     pub scopes: Vec<String>,
-    pub state: Option<AccessTokenState>,
+}
+
+impl Configuration {
+    pub fn initialise(&self) -> Store {
+        Store::new(reqwest::Client::new(), self.clone())
+    }
+
+    pub fn initialise_with(&self, client: reqwest::Client) -> Store {
+        Store::new(client, self.clone())
+    }
+
+    pub fn build_secret<A>(jwk: &JWK<A>) -> Result<Arc<Secret>, KeyError> {
+        match &jwk.algorithm {
+            AlgorithmParameters::RSA(rsa) => {
+                let secret = build_secret(&rsa)?;
+                Ok(Arc::new(secret))
+             },
+            AlgorithmParameters::EllipticCurve(_ec) => Err(KeyError::UnsupportedKeyError),
+            AlgorithmParameters::OctectKey { key_type: _, value: _ } => Err(KeyError::UnsupportedKeyError),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -57,7 +86,21 @@ pub enum GrantError {
     Json200ParseError(reqwest::Error),
 }
 
+#[derive(Debug)]
+pub enum KeyError {
+    UnsupportedKeyError,
+    IncompleteKeyError,
+}
+
 impl Store {
+    pub fn new(client: reqwest::Client, configuration: Configuration) -> Store {
+        Store {
+            client: client,
+            state: None,
+            configuration: configuration,
+        }
+    }
+
     pub fn grant(&mut self) -> Result<AccessToken, GrantError> {
         match self.local() {
             Some(token) => Ok(token.clone()),
@@ -90,7 +133,7 @@ impl Store {
         ];
 
         let mut response: reqwest::Response = self.client
-            .post(&self.endpoint)
+            .post(&self.configuration.endpoint)
             .header(ACCEPT, "application/json")
             .form(&parameters)
             .send()
@@ -123,13 +166,13 @@ impl Store {
     pub fn sign(&self) -> Result<String, GrantError> {
         let claims = ClaimsSet::<PrivateClaims> {
             registered: RegisteredClaims {
-                issuer: Some(StringOrUri::String(self.issuer.clone())),
+                issuer: Some(StringOrUri::String(self.configuration.issuer.clone())),
                 subject: None,
-                audience: Some(SingleOrMultiple::Single(StringOrUri::String(self.audience.clone()))),
+                audience: Some(SingleOrMultiple::Single(StringOrUri::String(self.configuration.audience.clone()))),
                ..Default::default()
             },
             private: PrivateClaims {
-                scope: self.scopes.join(" "),
+                scope: self.configuration.scopes.join(" "),
             },
         };
         let jwt: JWT<PrivateClaims, biscuit::Empty> = JWT::new_decoded(From::from(
@@ -139,7 +182,7 @@ impl Store {
             }),
             claims.clone(),
         );
-        let assertion = jwt.encode(&self.key)
+        let assertion = jwt.encode(&self.configuration.key)
             .map_err(|e| GrantError::JwtSignError(e))?
             .encoded()
             .map_err(|e| GrantError::JwtEncodeError(e))?
@@ -148,15 +191,42 @@ impl Store {
     }
 }
 
+fn build_secret(key: &RSAKeyParameters) -> Result<Secret, KeyError> {
+    // https://tools.ietf.org/html/rfc3447#appendix-A.1.2
+    let n = &key.n;
+    let e = &key.e;
+    let d = key.d.as_ref().ok_or(KeyError::IncompleteKeyError)?;
+    let p = key.p.as_ref().ok_or(KeyError::IncompleteKeyError)?;
+    let q = key.q.as_ref().ok_or(KeyError::IncompleteKeyError)?;
+    let dp = key.dp.as_ref().ok_or(KeyError::IncompleteKeyError)?;
+    let dq = key.dq.as_ref().ok_or(KeyError::IncompleteKeyError)?;
+    let qi = key.qi.as_ref().ok_or(KeyError::IncompleteKeyError)?;
+    let der = yasna::construct_der(|writer| {
+        writer.write_sequence(|writer| {
+            writer.next().write_u8(0);
+            writer.next().write_biguint(n);
+            writer.next().write_biguint(e);
+            writer.next().write_biguint(d);
+            writer.next().write_biguint(p);
+            writer.next().write_biguint(q);
+            writer.next().write_biguint(dp);
+            writer.next().write_biguint(dq);
+            writer.next().write_biguint(qi);
+        });
+    });
+    let key = RsaKeyPair::from_der(untrusted::Input::from(&der)).map_err(|_e| KeyError::IncompleteKeyError)?;
+    Ok(Secret::RsaKeyPair(Arc::new(key)))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::configuration::Configuration;
 
     #[test]
     fn test_oauth_token() {
-        let mut configuration = Configuration::from_env();
-        let token = configuration.oauth2.grant();
+        let configuration = Configuration::from_env();
+        let mut store = configuration.oauth2.initialise();
+        let token = store.grant();
         println!("token = {:?}", token);
     }
 }
