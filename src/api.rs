@@ -1,5 +1,9 @@
 use crate::configuration::Configuration;
-use crate::data::UserInfo;
+use crate::data::{
+    Environment,
+    AuthorityPublicKeys,
+    UserInfo,
+};
 use crate::oauth2;
 use reqwest::header;
 use std::fmt;
@@ -68,6 +72,12 @@ impl Api {
             .json()
             .map_err(|e| Error::CouldNotParseResponse(e))
 
+    }
+
+    pub fn keys(&mut self, environment: Environment) -> Result<AuthorityPublicKeys, Error> {
+        self.get(&format!("environment/public-keys/{}", environment.name))?
+            .json()
+            .map_err(|e| Error::CouldNotParseResponse(e))
     }
 }
 
