@@ -10,4 +10,5 @@ extern crate yasna;
 pub mod api;
 pub mod codec;
 pub mod configuration;
+pub mod oauth2;
 pub mod version;
