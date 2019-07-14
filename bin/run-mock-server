@@ -1,0 +1,5 @@
+#!/bin/sh -eux
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT/mock-server"
+cargo run

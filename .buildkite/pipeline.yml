@@ -4,15 +4,4 @@ steps:
       - docker#v1.1.1:
           image: smithsecuritydev/ci.rust-1.35:latest
     command:
-      - 'aws s3 cp s3://smith-artefacts/cache/smith-rs-cache.tar.gz smith-rs-cache.tar.gz || true'
-      - 'tar xfz smith-rs-cache.tar.gz -C \$CARGO_HOME || true'
-      - 'rm -f smith-rs-cache.tar.gz'
-      - 'aws s3 cp s3://smith-artefacts/cache/smith-rs-target-cache.tar.gz smith-rs-target-cache.tar.gz || true'
-      - 'tar xfz smith-rs-target-cache.tar.gz || true'
-      - 'rm -f smith-rs-target-cache.tar.gz'
-      - 'cargo build'
-      - 'cargo test'
-      - 'tar cfz smith-rs-cache.tar.gz -C \$CARGO_HOME registry'
-      - 'aws s3 cp smith-rs-cache.tar.gz s3://smith-artefacts/cache/smith-rs-cache.tar.gz'
-      - 'tar cfz smith-rs-target-cache.tar.gz target'
-      - 'aws s3 cp smith-rs-target-cache.tar.gz s3://smith-artefacts/cache/smith-rs-target-cache.tar.gz'
+      - './bin/ci'
