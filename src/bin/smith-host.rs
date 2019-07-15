@@ -1,6 +1,10 @@
 extern crate smith;
 
 use clap::{App, AppSettings, Arg};
+use smith::data::{AuthorityPublicKeys, Environment};
+use smith::api::Api;
+use smith::configuration::Configuration;
+
 
 fn main() {
     let matches = App::new("smith-host")
@@ -34,6 +38,19 @@ fn main() {
         std::process::exit(0)
     }
 
-    eprintln!("Not implemented yet.");
-    std::process::exit(1)
+    let configuration = Configuration::from_env();
+    let mut api = Api::new(configuration);
+    // FIX handle file case.
+    match api.keys(Environment { name: environment.to_string() } ) {
+        Ok(AuthorityPublicKeys { keys }) => {
+            for key in keys.iter() {
+                println!("{}", key);
+            }
+            std::process::exit(0)
+        },
+        Err(err) => {
+            eprintln!("{}", err);
+            std::process::exit(1)
+        },
+    }
 }
