@@ -41,7 +41,7 @@ fn main() {
     let configuration = Configuration::from_env();
     let mut api = Api::new(configuration);
     // FIX handle file case.
-    match api.keys(Environment { name: environment.to_string() } ) {
+    match api.keys(&Environment { name: environment.to_string() } ) {
         Ok(AuthorityPublicKeys { keys }) => {
             for key in keys.iter() {
                 println!("{}", key);
