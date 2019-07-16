@@ -1,13 +1,17 @@
 use crate::configuration::Configuration;
 use crate::data::{
-    Environment,
     AuthorityPublicKeys,
+    Certificate,
+    Environment,
+    HostName,
+    PublicKey,
+    Principal,
     UserInfo,
 };
 use crate::oauth2;
 use reqwest::header;
+use serde_json::{Value, json};
 use std::fmt;
-
 
 pub struct Api {
     pub configuration: Configuration,
@@ -67,6 +71,28 @@ impl Api {
         }
     }
 
+    pub fn post(&mut self, url: &str, body: &Value) -> Result<reqwest::Response, Error> {
+        let token = self.oauth2.grant().map_err(|e| Error::GrantError(e))?;
+        let mut response = self.client
+            .post(&format!("{}/{}", self.configuration.endpoint, url))
+            .bearer_auth(&token.value)
+            .header(header::ACCEPT, "application/json")
+            .header(header::CONTENT_TYPE, "application/json")
+            .json(body)
+            .send()
+            .map_err(|e| Error::RequestError(e))?;
+        match response.status() {
+            reqwest::StatusCode::OK => Ok(response),
+            reqwest::StatusCode::BAD_REQUEST | reqwest::StatusCode::FORBIDDEN | reqwest::StatusCode::INTERNAL_SERVER_ERROR => {
+                let error: ServerError = response
+                    .json()
+                    .map_err(|e| Error::CouldNotParseErrorResponse(response.status(), e))?;
+                Err(Error::ServerError(response.status(), error))
+            },
+            s => Err(Error::InvalidStatusCode(s)),
+        }
+    }
+
     pub fn whoami(&mut self) -> Result<UserInfo, Error> {
         self.get("userinfo")?
             .json()
@@ -74,11 +100,23 @@ impl Api {
 
     }
 
-    pub fn keys(&mut self, environment: Environment) -> Result<AuthorityPublicKeys, Error> {
+    pub fn keys(&mut self, environment: &Environment) -> Result<AuthorityPublicKeys, Error> {
         self.get(&format!("environment/public-keys/{}", environment.name))?
             .json()
             .map_err(|e| Error::CouldNotParseResponse(e))
     }
+
+    pub fn issue(&mut self, environment: &Environment, public_key: &PublicKey, principals: &[Principal], host: &Option<HostName>) -> Result<Certificate, Error> {
+        self.post("issue", &json!({
+            "public-key": public_key.encoded,
+            "principals": principals.iter().map(|p| &p.name).collect::<Vec<_>>(),
+            "environment": environment.name,
+            "host-name": host.as_ref().map(|h| &h.host),
+        }))?
+            .json()
+            .map_err(|e| Error::CouldNotParseResponse(e))
+    }
+
 }
 
 #[cfg(test)]
@@ -100,8 +138,7 @@ mod tests {
         serde_json::from_str(&contents).expect("Should be able to deserialise credentials file.")
     }
 
-    #[test]
-    fn test_whoami() {
+    fn test_api() -> Api {
         let server = std::env::var("SERVER").unwrap_or("http://localhost:8000".to_string());
         let jwk = read_jwk(Path::new("test/data/credentials.json"));
         let oauth2 = oauth2::Configuration {
@@ -116,8 +153,33 @@ mod tests {
             jwk,
             oauth2,
         };
-        let mut api = Api::new(configuration);
+        Api::new(configuration)
+    }
+
+    #[test]
+    fn test_whoami() {
+        let mut api = test_api();
         let userinfo = api.whoami().expect("Should be able to make userinfo call.");
         assert_eq!(userinfo, UserInfo { user_id: "1".to_string() } );
     }
+
+    #[test]
+    fn test_keys() {
+        let environment = Environment { name: "mock".to_string() };
+        let mut api = test_api();
+        let keys = api.keys(&environment).expect("Should be able to make keys call.");
+        assert!(keys.keys.len() > 0);
+    }
+
+    #[test]
+    fn test_issue() {
+        let environment = Environment { name: "mock".to_string() };
+        let public_key = PublicKey { encoded: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDI6z6dBtqnv2F0kqD8gnRMPkAoOdNpaa5qnx3UyXM8RApmBY180RKTSLzTRcrFFYxDfHLOFWw/V0JM4bLwNaHhhuYGllYqb2qHlVs7KgoytBGy//xtRMemkX2BY5UwD8iqw+5a45xqoddL8hTRk77ploFa7ItgTVVPD30l3hZHWWQr2/eINI9G41nLfQZkOYjkNf1s8DJsHI8FunKgp8lwGMUZaAq9mnYpVHBQX6LSjZiBUN9pIkoDO5+08AN6RIUIgJ9Q0T0AGLRcMQKTx1fkeV7wkreJF2TmBVUE0ZOIDQEOOis1+YigT4JAqrDI0+OYGzEGu2tHFRemjs3uvQLb test".to_string() };
+        let principals = vec![Principal { name: "root".to_string() }];
+        let host = Some(HostName { host: "host".to_string() });
+        let mut api = test_api();
+        let certificate = api.issue(&environment, &public_key, &principals, &host).expect("Should be able to make keys call.");
+        assert!(certificate.encoded.len() > 0);
+    }
+
 }
