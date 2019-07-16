@@ -7,6 +7,7 @@ extern crate serde_json;
 extern crate serde_derive;
 extern crate yasna;
 
+pub mod agent;
 pub mod api;
 pub mod configuration;
 pub mod data;
