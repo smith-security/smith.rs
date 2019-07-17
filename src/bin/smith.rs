@@ -1,8 +1,20 @@
 extern crate clap;
+extern crate openssl;
 extern crate smith;
 extern crate whoami;
 
 use clap::{App, AppSettings, Arg};
+
+use exec::Command;
+
+use smith::agent::Agent;
+use smith::api::Api;
+use smith::keys;
+use smith::configuration::Configuration;
+use smith::data::{Environment, Principal, PublicKey};
+
+use openssl::rsa::Rsa;
+
 
 fn main() {
     let matches = App::new("smith")
@@ -31,21 +43,56 @@ fn main() {
         eprintln!("Problem parsing arguments, no ENVIRONMENT specified.");
         std::process::exit(1);
     });
-
+    let environment = Environment { name: environment.to_string() };
     let principal = matches.value_of("PRINCIPAL").map(|p| p.to_string()).unwrap_or(whoami::username());
+    let principal = Principal { name: principal.to_string() };
 
-    let cmd = matches.values_of("CMD");
+    let command = matches.values_of("CMD");
 
     if cfg!(feature = "cli-test") {
-        println!("SMITH_CLI_ENVIRONMENT='{}'", environment);
-        println!("SMITH_CLI_PRINCIPAL='{}'", principal);
-        if let Some(cmd) = cmd {
-            let cmd = cmd.into_iter().collect::<Vec<&str>>().join(" ");
-            println!("SMITH_CLI_COMMAND='{}'", cmd);
+        println!("SMITH_CLI_ENVIRONMENT='{}'", environment.name);
+        println!("SMITH_CLI_PRINCIPAL='{}'", principal.name);
+        if let Some(command) = command {
+            let command = command.into_iter().collect::<Vec<&str>>().join(" ");
+            println!("SMITH_CLI_COMMAND='{}'", command);
         }
         std::process::exit(0)
     }
-
-    eprintln!("Not implemented yet.");
-    std::process::exit(1)
+    let now = std::time::SystemTime::now();
+    println!("since {} / {:?}", 1, now.elapsed());
+    let mut agent = Agent::connect().unwrap_or_else(|| {
+        eprintln!("Could not connect to ssh-agent.");
+        std::process::exit(1);
+    });
+    println!("since {} / {:?}", 2, now.elapsed());
+    let configuration = Configuration::from_env();
+    println!("since {} / {:?}", 3, now.elapsed());
+    let mut api = Api::new(configuration);
+    println!("since {} / {:?}", 4, now.elapsed());
+    let keys = Rsa::generate(4096).unwrap_or_else(|e| {
+        eprintln!("Could not generate an RSA key pair: {}", e);
+        std::process::exit(1);
+    });
+    println!("since {} / {:?}", 5, now.elapsed());
+    let encoded = keys::encode_ssh(&keys, "comment");
+    println!("since {} / {:?}", 6, now.elapsed());
+    let public = PublicKey { encoded };
+    let certificate = api.issue(&environment, &public, &vec![principal], &None).unwrap_or_else(|e| {
+        // FIX Requires better error message...
+        eprintln!("Could not issue a certificate: {:?}", e);
+        std::process::exit(1);
+    });
+    println!("since {} / {:?}", 7, now.elapsed());
+    agent.add_certificate(&keys, &certificate).unwrap_or_else(|e| {
+        // FIX Requires better error message...
+        eprintln!("Could not add certificate to agent: {:?}", e);
+        std::process::exit(1);
+    });
+    println!("since {} / {:?}", 8, now.elapsed());
+    if let Some(command) = command {
+        let command = command.into_iter().collect::<Vec<&str>>();
+        let result = Command::new(&command[0]).args(&command[1..]).exec();
+        eprintln!("Could not execute command: {}", result);
+        std::process::exit(1)
+    }
 }

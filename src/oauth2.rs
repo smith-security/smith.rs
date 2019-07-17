@@ -182,16 +182,21 @@ impl Store {
             }),
             claims.clone(),
         );
+        let now = std::time::SystemTime::now();
+        println!("signing {:?}", now);
         let assertion = jwt.encode(&self.configuration.key)
             .map_err(|e| GrantError::JwtSignError(e))?
             .encoded()
             .map_err(|e| GrantError::JwtEncodeError(e))?
             .encode();
+        println!("done signing {:?}", now.elapsed());
         Ok(assertion)
     }
 }
 
 fn build_secret(key: &RSAKeyParameters) -> Result<Secret, KeyError> {
+    let now = std::time::SystemTime::now();
+    println!("building secret {:?}", now);
     // https://tools.ietf.org/html/rfc3447#appendix-A.1.2
     let n = &key.n;
     let e = &key.e;
@@ -215,6 +220,7 @@ fn build_secret(key: &RSAKeyParameters) -> Result<Secret, KeyError> {
         });
     });
     let key = RsaKeyPair::from_der(untrusted::Input::from(&der)).map_err(|_e| KeyError::IncompleteKeyError)?;
+    println!("done building secret {:?}", now.elapsed());
     Ok(Secret::RsaKeyPair(Arc::new(key)))
 }
 

@@ -72,7 +72,10 @@ impl Api {
     }
 
     pub fn post(&mut self, url: &str, body: &Value) -> Result<reqwest::Response, Error> {
+        let now = std::time::SystemTime::now();
+        println!("post {} / {:?}", 1, now.elapsed());
         let token = self.oauth2.grant().map_err(|e| Error::GrantError(e))?;
+        println!("post {} / {:?}", 2, now.elapsed());
         let mut response = self.client
             .post(&format!("{}/{}", self.configuration.endpoint, url))
             .bearer_auth(&token.value)
@@ -81,6 +84,7 @@ impl Api {
             .json(body)
             .send()
             .map_err(|e| Error::RequestError(e))?;
+        println!("post {} / {:?}", 3, now.elapsed());
         match response.status() {
             reqwest::StatusCode::OK => Ok(response),
             reqwest::StatusCode::BAD_REQUEST | reqwest::StatusCode::FORBIDDEN | reqwest::StatusCode::INTERNAL_SERVER_ERROR => {
