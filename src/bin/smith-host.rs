@@ -4,7 +4,8 @@ use clap::{App, AppSettings, Arg};
 use smith::data::{AuthorityPublicKeys, Environment};
 use smith::api::Api;
 use smith::configuration::Configuration;
-
+use std::fs::File;
+use std::io::Write;
 
 fn main() {
     let matches = App::new("smith-host")
@@ -40,13 +41,27 @@ fn main() {
 
     let configuration = Configuration::from_env();
     let mut api = Api::new(configuration);
-    // FIX handle file case.
     match api.keys(&Environment { name: environment.to_string() } ) {
         Ok(AuthorityPublicKeys { keys }) => {
-            for key in keys.iter() {
-                println!("{}", key);
+            match file {
+                None => {
+                    for key in keys.iter() {
+                        println!("{}", key);
+                    }
+                },
+                Some(file) => {
+                    let mut file = File::create(file).unwrap_or_else(|e| {
+                        eprintln!("Could not create file to write certificate-authority keys: {}", e);
+                        std::process::exit(1);
+                    });
+                    for key in keys.iter() {
+                        file.write_all(format!("{}\n", &key).as_bytes()).unwrap_or_else(|e| {
+                            eprintln!("Could not write key to specified file: {}", e);
+                            std::process::exit(1);
+                        });
+                    }
+                },
             }
-            std::process::exit(0)
         },
         Err(err) => {
             eprintln!("{}", err);
