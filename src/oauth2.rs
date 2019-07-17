@@ -182,14 +182,11 @@ impl Store {
             }),
             claims.clone(),
         );
-        let now = std::time::SystemTime::now();
-        println!("signing {:?}", now);
         let assertion = jwt.encode(&self.configuration.key)
             .map_err(|e| GrantError::JwtSignError(e))?
             .encoded()
             .map_err(|e| GrantError::JwtEncodeError(e))?
             .encode();
-        println!("done signing {:?}", now.elapsed());
         Ok(assertion)
     }
 }

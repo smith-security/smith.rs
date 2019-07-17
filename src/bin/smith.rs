@@ -58,37 +58,28 @@ fn main() {
         }
         std::process::exit(0)
     }
-    let now = std::time::SystemTime::now();
-    println!("since {} / {:?}", 1, now.elapsed());
     let mut agent = Agent::connect().unwrap_or_else(|| {
         eprintln!("Could not connect to ssh-agent.");
         std::process::exit(1);
     });
-    println!("since {} / {:?}", 2, now.elapsed());
     let configuration = Configuration::from_env();
-    println!("since {} / {:?}", 3, now.elapsed());
     let mut api = Api::new(configuration);
-    println!("since {} / {:?}", 4, now.elapsed());
     let keys = Rsa::generate(4096).unwrap_or_else(|e| {
         eprintln!("Could not generate an RSA key pair: {}", e);
         std::process::exit(1);
     });
-    println!("since {} / {:?}", 5, now.elapsed());
     let encoded = keys::encode_ssh(&keys, "comment");
-    println!("since {} / {:?}", 6, now.elapsed());
     let public = PublicKey { encoded };
     let certificate = api.issue(&environment, &public, &vec![principal], &None).unwrap_or_else(|e| {
         // FIX Requires better error message...
         eprintln!("Could not issue a certificate: {:?}", e);
         std::process::exit(1);
     });
-    println!("since {} / {:?}", 7, now.elapsed());
     agent.add_certificate(&keys, &certificate).unwrap_or_else(|e| {
         // FIX Requires better error message...
         eprintln!("Could not add certificate to agent: {:?}", e);
         std::process::exit(1);
     });
-    println!("since {} / {:?}", 8, now.elapsed());
     if let Some(command) = command {
         let command = command.into_iter().collect::<Vec<&str>>();
         let result = Command::new(&command[0]).args(&command[1..]).exec();
