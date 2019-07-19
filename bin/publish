@@ -1,0 +1,36 @@
+#!/bin/sh -eu
+
+VERSION="0.1.0"
+STAMP="$VERSION-$(date "+%Y%m%d%H%M%S")-$(git log --pretty=format:%h -n 1)"
+: ${PLATFORM:=debian/stretch}
+: ${BRANCH:=$BUILDKITE_BRANCH}
+: ${BUILD_NUMBER:=$BUILDKITE_BUILD_NUMBER}
+
+export AWS_DEFAULT_REGION=us-east-1
+
+aws s3 cp s3://smith-artefacts/cache/smith-rs-release-cache.tar.gz smith-rs-release-cache.tar.gz || true
+tar xfz smith-rs-release-cache.tar.gz -C $CARGO_HOME || true
+rm -f smith-rs-release-cache.tar.gz
+
+aws s3 cp s3://smith-artefacts/cache/smith-rs-target-release-cache.tar.gz smith-rs-target-release-cache.tar.gz || true
+tar xfz smith-rs-target-release-cache.tar.gz || true
+rm -f smith-rs-target-release-cache.tar.gz
+
+cargo build --release
+
+tar cfz smith-rs-target-release-cache.tar.gz target
+aws s3 cp smith-rs-target-release-cache.tar.gz s3://smith-artefacts/cache/smith-rs-target-release-cache.tar.gz
+
+tar cfz smith-rs-release-cache.tar.gz -C $CARGO_HOME registry
+aws s3 cp smith-rs-release-cache.tar.gz s3://smith-artefacts/cache/smith-rs-release-cache.tar.gz
+
+mkdir -p "publish"
+for EXECUTABLE in smith smith-host smith-whoami; do
+    SOURCE="target/release/$EXECUTABLE"
+    TARGET="s3://smith-artefacts/executables/$BRANCH/$EXECUTABLE/$PLATFORM/$VERSION/$STAMP/$EXECUTABLE-$STAMP"
+    MARKER="s3://smith-artefacts/executables/$BRANCH/$EXECUTABLE/$PLATFORM/latest"
+    echo "$TARGET" > latest;
+    cp latest "publish/$EXECUTABLE"
+    aws s3 cp "$SOURCE" "$TARGET"
+    aws s3 cp latest "$MARKER"
+done

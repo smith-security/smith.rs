@@ -5,3 +5,22 @@ steps:
           image: smithsecuritydev/ci.rust-1.35:latest
     command:
       - './bin/ci'
+
+  - wait
+
+  - label: smith-cli-docker
+    branches: master
+    plugins:
+      - docker#v1.1.1:
+          image: smithsecuritydev/ci.rust-1.35:latest
+      - artifacts#v1.2.0:
+          upload: "publish/*"
+    command:
+      - './bin/publish'
+
+  - wait
+
+  - label: smith-cli-docker
+    branches: master
+    command:
+      - './bin/push'
