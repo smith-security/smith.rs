@@ -13,6 +13,9 @@ steps:
     plugins:
       - docker#v1.1.1:
           image: smithsecuritydev/ci.rust-1.35:latest
+          environment:
+            - "BUILDKITE_BRANCH"
+            - "BUILDKITE_BUILD_NUMBER"
       - artifacts#v1.2.0:
           upload: "publish/*"
     command:
