@@ -25,5 +25,8 @@ steps:
 
   - label: smith-cli-docker
     branches: master
+    plugins:
+      - artifacts#v1.2.0:
+          download: "publish/*"
     command:
       - './bin/push'
