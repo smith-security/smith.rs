@@ -1,4 +1,15 @@
 steps:
+  - label: smith-cli-docker-musl
+    plugins:
+      - docker#v1.1.1:
+          image: smithsecuritydev/ci.rust-1.35.musl:latest
+          environment:
+            - "BUILDKITE_BRANCH"
+            - "BUILDKITE_BUILD_NUMBER"
+
+    command:
+      - './bin/publish-musl'
+
   - label: smith.rs
     plugins:
       - docker#v1.1.1:
