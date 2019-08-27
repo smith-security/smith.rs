@@ -14,6 +14,24 @@ pub enum ProtocolError {
     UnknownResponse(u8),
     InvalidResponse(Vec<u8>),
     UnexpectedReply(Reply),
+    InvalidCertificate,
+}
+
+impl std::fmt::Display for ProtocolError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ProtocolError::IoError(err) =>
+                write!(f, "IO Error / {:?}", err),
+            ProtocolError::UnknownResponse(_response) =>
+                write!(f, "Unknown response from SSH agent, ensure you are running an openssh based agent."),
+            ProtocolError::InvalidResponse(_response) =>
+                write!(f, "Invalid response from SSH agent, ensure you are running an openssh based agent."),
+            ProtocolError::UnexpectedReply(_reply) =>
+                write!(f, "Agent failed to add key and/or certificate to SSH agent, ensure you are running an openssh based agent, note that gnome-keyring does not support certificates."),
+            ProtocolError::InvalidCertificate =>
+                write!(f, "The server returned an invalid or incomplete certificate."),
+        }
+    }
 }
 
 impl From<std::io::Error> for ProtocolError {
@@ -55,7 +73,6 @@ impl Agent {
         codec::encode_bignum(&mut buffer, key.q().expect("q"))?;
         // FUTURE: Better default comment.
         codec::encode_string(&mut buffer, comment.as_ref().unwrap_or(&"foo".to_string()))?;
-        // FIX handle reply
         let reply = self.send(Message::AddIdentityMessage, &buffer.into_inner())?;
         if reply != Reply::SuccessReply {
             return Err(ProtocolError::UnexpectedReply(reply));
@@ -64,18 +81,17 @@ impl Agent {
     }
 
     pub fn add_certificate(&mut self, key: &Rsa<Private>, certificate: &Certificate) -> Result<(), ProtocolError> {
-        // FIX error..
-        let certificate = certificate.deconstruct().expect("aaa unw");
+        let certificate = certificate.deconstruct().ok_or(ProtocolError::InvalidCertificate)?;
         self.add_private_key(key, &certificate.comment)?;
         let mut buffer = Cursor::new(vec![0 as u8; 100]);
         codec::encode_string(&mut buffer, &certificate.key_type)?;
         codec::encode_bytes(&mut buffer, &certificate.blob)?;
         codec::encode_bignum(&mut buffer, key.d())?;
-        codec::encode_bignum(&mut buffer, key.iqmp().expect("iqmp"))?;
-        codec::encode_bignum(&mut buffer, key.p().expect("p"))?;
-        codec::encode_bignum(&mut buffer, key.q().expect("q"))?;
+        codec::encode_bignum(&mut buffer, key.iqmp().ok_or(ProtocolError::InvalidCertificate)?)?;
+        codec::encode_bignum(&mut buffer, key.p().ok_or(ProtocolError::InvalidCertificate)?)?;
+        codec::encode_bignum(&mut buffer, key.q().ok_or(ProtocolError::InvalidCertificate)?)?;
         // FUTURE: Better default comment.
-        codec::encode_string(&mut buffer, &certificate.comment.unwrap_or("".to_string()))?;
+        codec::encode_string(&mut buffer, &certificate.comment.unwrap_or("smith".to_string()))?;
         let reply = self.send(Message::AddIdentityMessage, &buffer.into_inner())?;
         if reply != Reply::SuccessReply {
             return Err(ProtocolError::UnexpectedReply(reply));

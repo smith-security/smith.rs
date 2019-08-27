@@ -21,6 +21,11 @@ fn main() {
 	.version(&smith::version::smith_version()[..])
 	.about("Request short-lived certificate from smith.")
 	.setting(AppSettings::ArgRequiredElseHelp)
+	.arg(Arg::with_name("DEBUG")
+	     .short("d")
+	     .long("debug")
+	     .help("Obtain verbose error messages.")
+	     .required(false))
 	.arg(Arg::with_name("ENVIRONMENT")
 	     .short("e")
 	     .long("environment")
@@ -48,6 +53,7 @@ fn main() {
     let principal = Principal { name: principal.to_string() };
 
     let command = matches.values_of("CMD");
+    let debug = matches.occurrences_of("DEBUG") > 0;
 
     if cfg!(feature = "cli-test") {
         println!("SMITH_CLI_ENVIRONMENT='{}'", environment.name);
@@ -66,18 +72,25 @@ fn main() {
     let mut api = Api::new(configuration);
     let keys = Rsa::generate(4096).unwrap_or_else(|e| {
         eprintln!("Could not generate an RSA key pair: {}", e);
+        if debug {
+            eprintln!("DEBUG: {:?}", e);
+        }
         std::process::exit(1);
     });
     let encoded = keys::encode_ssh(&keys, "comment");
     let public = PublicKey { encoded };
     let certificate = api.issue(&environment, &public, &vec![principal], &None).unwrap_or_else(|e| {
-        // FIX Requires better error message...
-        eprintln!("Could not issue a certificate: {:?}", e);
+        eprintln!("Could not issue a certificate: {}", e);
+        if debug {
+            eprintln!("DEBUG: {:?}", e);
+        }
         std::process::exit(1);
     });
     agent.add_certificate(&keys, &certificate).unwrap_or_else(|e| {
-        // FIX Requires better error message...
-        eprintln!("Could not add certificate to agent: {:?}", e);
+        eprintln!("Could not add certificate to agent: {}", e);
+        if debug {
+            eprintln!("DEBUG: {:?}", e);
+        }
         std::process::exit(1);
     });
     if let Some(command) = command {
