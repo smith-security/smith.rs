@@ -32,7 +32,20 @@ pub enum Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "error thing")
+        match self {
+            Error::RequestError(_) =>
+              write!(f, "Request error trying to contact the server, please check connectivity to Smith and retry request."),
+            Error::InvalidStatusCode(_) =>
+              write!(f, "Server responded with an invalid status code, please check connectivity to Smith and retry request."),
+            Error::ServerError(_, _) =>
+              write!(f, "Request failed, please check connectivity to Smith and retry request."),
+            Error::CouldNotParseErrorResponse(_, _) =>
+              write!(f, "Invalid error response from server, request failed but we couldn't decode the error, please check connectivity to Smith and retry request."),
+            Error::CouldNotParseResponse(_) =>
+              write!(f, "Invalid response from server, please check connectivity to Smith and retry request."),
+            Error::GrantError(_) =>
+              write!(f, "OAuth2 grant failed, check your API credentials are valid."),
+        }
     }
 }
 
