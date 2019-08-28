@@ -8,6 +8,10 @@ STAMP="$VERSION-$(date "+%Y%m%d%H%M%S")-$(git log --pretty=format:%h -n 1)"
 
 export AWS_DEFAULT_REGION=us-east-1
 
+echo $HOME
+env | grep CARGO
+ls -al /root/.cargo
+
 rm rust-toolchain
 rustup toolchain list
 cargo build --release
