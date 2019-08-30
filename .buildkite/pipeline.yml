@@ -21,6 +21,11 @@ steps:
     command:
       - './bin/publish'
 
+  - label: smith-cli-docker-musl
+    branches: master
+    command:
+      - './bin/publish-musl'
+
   - wait
 
   - label: smith-cli-docker
