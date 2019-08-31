@@ -7,7 +7,7 @@ license = "BSD-3-Clause"
 homepage = "https://smith.st"
 repository = "https://github.com/smith-security/smith.rs"
 description = "Smith client. Command line tools for interacting with https://smith.st services."
-categories = ["API bindings", "Command line utilities", "Authentication"]
+categories = ["api-bindings", "command-line-utilities", "authentication"]
 
 [dependencies]
 base64 = "0.10.1"
