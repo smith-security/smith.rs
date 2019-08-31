@@ -1,24 +1,24 @@
 extern crate clap;
 extern crate openssl;
-extern crate smith;
+extern crate smith_ssh;
 extern crate whoami;
 
 use clap::{App, AppSettings, Arg};
 
 use exec::Command;
 
-use smith::agent::Agent;
-use smith::api::Api;
-use smith::keys;
-use smith::configuration::Configuration;
-use smith::data::{Environment, Principal, PublicKey};
+use smith_ssh::agent::Agent;
+use smith_ssh::api::Api;
+use smith_ssh::keys;
+use smith_ssh::configuration::Configuration;
+use smith_ssh::data::{Environment, Principal, PublicKey};
 
 use openssl::rsa::Rsa;
 
 
 fn main() {
     let matches = App::new("smith")
-	.version(&smith::version::smith_version()[..])
+	.version(&smith_ssh::version::smith_version()[..])
 	.about("Request short-lived certificate from smith.")
 	.setting(AppSettings::ArgRequiredElseHelp)
 	.arg(Arg::with_name("DEBUG")

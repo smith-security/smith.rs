@@ -1,16 +1,16 @@
 extern crate clap;
-extern crate smith;
+extern crate smith_ssh;
 extern crate whoami;
 
 use clap::App;
 
-use smith::data::UserInfo;
-use smith::api::Api;
-use smith::configuration::Configuration;
+use smith_ssh::data::UserInfo;
+use smith_ssh::api::Api;
+use smith_ssh::configuration::Configuration;
 
 fn main() {
     let _matches = App::new("smith-whoami")
-	.version(&smith::version::smith_version()[..])
+	.version(&smith_ssh::version::smith_version()[..])
 	.about("Request user id from server, useful for verifying authentication.")
 	.get_matches();
 

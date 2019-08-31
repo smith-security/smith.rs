@@ -1,15 +1,15 @@
-extern crate smith;
+extern crate smith_ssh;
 
 use clap::{App, AppSettings, Arg};
-use smith::data::{AuthorityPublicKeys, Environment};
-use smith::api::Api;
-use smith::configuration::Configuration;
+use smith_ssh::data::{AuthorityPublicKeys, Environment};
+use smith_ssh::api::Api;
+use smith_ssh::configuration::Configuration;
 use std::fs::File;
 use std::io::Write;
 
 fn main() {
     let matches = App::new("smith-host")
-	.version(&smith::version::smith_version()[..])
+	.version(&smith_ssh::version::smith_version()[..])
 	.about("Fetch certificate-authority public keys for smith managed hosts.")
 	.setting(AppSettings::ArgRequiredElseHelp)
 	.arg(Arg::with_name("ENVIRONMENT")
