@@ -8,6 +8,7 @@ for EXECUTABLE in smith smith-host smith-whoami; do
     SOURCE="$(cat "publish/$EXECUTABLE")"
     mkdir -p "$(dirname "$TARGET")"
     aws s3 cp "$SOURCE" "$TARGET"
+    chmod +x "$TARGET"
 done
 
 docker build \
