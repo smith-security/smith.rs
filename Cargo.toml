@@ -1,5 +1,5 @@
 [package]
-name = "smith"
+name = "smith-ssh"
 version = "0.1.0"
 authors = ["Mark Hibberd <mark@hibberd.id.au>"]
 edition = "2018"
