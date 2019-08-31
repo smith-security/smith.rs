@@ -25,6 +25,9 @@ pub enum Error {
     RequestError(reqwest::Error),
     InvalidStatusCode(reqwest::StatusCode),
     ServerError(reqwest::StatusCode, ServerError),
+    ClientError(reqwest::StatusCode, ServerError),
+    PermissionError(reqwest::StatusCode, ServerError),
+    NotFoundError(reqwest::StatusCode, ServerError),
     CouldNotParseErrorResponse(reqwest::StatusCode, reqwest::Error),
     CouldNotParseResponse(reqwest::Error),
     GrantError(oauth2::GrantError),
@@ -39,6 +42,12 @@ impl fmt::Display for Error {
               write!(f, "Server responded with an invalid status code, please check connectivity to Smith and retry request."),
             Error::ServerError(_, _) =>
               write!(f, "Request failed, please check connectivity to Smith and retry request."),
+            Error::ClientError(_, _) =>
+              write!(f, "Request failed, the request was invalid, check your command/arguments."),
+            Error::NotFoundError(_, _) =>
+              write!(f, "Request failed, the requested resource was not found, check your command/arguments."),
+            Error::PermissionError(_, _) =>
+              write!(f, "Request denied, you don't have access to this resource."),
             Error::CouldNotParseErrorResponse(_, _) =>
               write!(f, "Invalid error response from server, request failed but we couldn't decode the error, please check connectivity to Smith and retry request."),
             Error::CouldNotParseResponse(_) =>
@@ -74,11 +83,29 @@ impl Api {
             .map_err(|e| Error::RequestError(e))?;
         match response.status() {
             reqwest::StatusCode::OK => Ok(response),
-            reqwest::StatusCode::BAD_REQUEST | reqwest::StatusCode::FORBIDDEN | reqwest::StatusCode::INTERNAL_SERVER_ERROR => {
+            reqwest::StatusCode::BAD_REQUEST => {
+                let error: ServerError = response
+                    .json()
+                    .map_err(|e| Error::CouldNotParseErrorResponse(response.status(), e))?;
+                Err(Error::ClientError(response.status(), error))
+            },
+            reqwest::StatusCode::FORBIDDEN => {
+                let error: ServerError = response
+                    .json()
+                    .map_err(|e| Error::CouldNotParseErrorResponse(response.status(), e))?;
+                Err(Error::PermissionError(response.status(), error))
+            },
+            reqwest::StatusCode::INTERNAL_SERVER_ERROR => {
                 let error: ServerError = response
                     .json()
                     .map_err(|e| Error::CouldNotParseErrorResponse(response.status(), e))?;
                 Err(Error::ServerError(response.status(), error))
+            },
+            reqwest::StatusCode::NOT_FOUND => {
+                let error: ServerError = response
+                    .json()
+                    .map_err(|e| Error::CouldNotParseErrorResponse(response.status(), e))?;
+                Err(Error::NotFoundError(response.status(), error))
             },
             s => Err(Error::InvalidStatusCode(s)),
         }
@@ -96,11 +123,29 @@ impl Api {
             .map_err(|e| Error::RequestError(e))?;
         match response.status() {
             reqwest::StatusCode::OK => Ok(response),
-            reqwest::StatusCode::BAD_REQUEST | reqwest::StatusCode::FORBIDDEN | reqwest::StatusCode::INTERNAL_SERVER_ERROR => {
+            reqwest::StatusCode::BAD_REQUEST => {
+                let error: ServerError = response
+                    .json()
+                    .map_err(|e| Error::CouldNotParseErrorResponse(response.status(), e))?;
+                Err(Error::ClientError(response.status(), error))
+            },
+            reqwest::StatusCode::FORBIDDEN => {
+                let error: ServerError = response
+                    .json()
+                    .map_err(|e| Error::CouldNotParseErrorResponse(response.status(), e))?;
+                Err(Error::PermissionError(response.status(), error))
+            },
+            reqwest::StatusCode::INTERNAL_SERVER_ERROR => {
                 let error: ServerError = response
                     .json()
                     .map_err(|e| Error::CouldNotParseErrorResponse(response.status(), e))?;
                 Err(Error::ServerError(response.status(), error))
+            },
+            reqwest::StatusCode::NOT_FOUND => {
+                let error: ServerError = response
+                    .json()
+                    .map_err(|e| Error::CouldNotParseErrorResponse(response.status(), e))?;
+                Err(Error::NotFoundError(response.status(), error))
             },
             s => Err(Error::InvalidStatusCode(s)),
         }
